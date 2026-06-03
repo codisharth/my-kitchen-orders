@@ -41,7 +41,7 @@ h1{font-size:13px;line-height:1.3;font-weight:700;color:var(--muted);max-width:5
 .label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 7px;}
 .label:first-child{margin-top:0;}
 input{width:100%;border:1px solid var(--border);background:var(--panel2);border-radius:8px;padding:12px 13px;font:inherit;font-size:16px;color:var(--text);outline:none;color-scheme:dark;}
-input:focus{border-color:var(--accent);background:#fff;}
+input:focus{border-color:var(--gold);background:var(--panel2);color:var(--text);}
 .menu{display:grid;gap:8px;}
 .item{border:1px solid var(--border);background:var(--panel2);border-radius:8px;padding:12px;color:var(--text);display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;transition:border-color .15s;}
 .item strong{display:block;font-size:14px;margin-bottom:2px;}
@@ -52,8 +52,8 @@ input:focus{border-color:var(--accent);background:#fff;}
 .soldout-badge{display:inline-block;font-size:11px;font-weight:700;color:var(--red);background:#fce8e8;border-radius:4px;padding:2px 7px;margin-top:4px;}
 .nowrap{white-space:nowrap;}
 .qty{display:flex;align-items:center;gap:8px;}
-.qty button{width:32px;height:32px;border:1px solid var(--border);background:#fff;border-radius:8px;font-size:18px;font-weight:800;color:var(--text);cursor:pointer;}
-.qty button:active{background:var(--panel2);}
+.qty button{width:32px;height:32px;border:1px solid var(--gold);background:rgba(201,162,39,.15);border-radius:8px;font-size:18px;font-weight:800;color:var(--gold);cursor:pointer;}
+.qty button:active{background:rgba(201,162,39,.3);}
 .qty button:disabled{opacity:.4;cursor:not-allowed;}
 .qty-num{min-width:20px;text-align:center;font-weight:800;}
 .actions{display:flex;gap:10px;margin-top:16px;}
