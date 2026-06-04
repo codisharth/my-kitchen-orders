@@ -279,8 +279,8 @@ function clearOrder(){
 function showConfirmation(order){
   const box=document.getElementById('confirmation');
   box.innerHTML=`
-    <h2>Your order is placed</h2>
-    <p style="color:var(--muted);font-size:14px;line-height:1.45;">Thank you, ${esc(order.name)}. Radhe Rasoi has received your order.</p>
+    <h2>Order pending</h2>
+    <p style="color:var(--muted);font-size:14px;line-height:1.45;">Thank you, ${esc(order.name)}. Radhe Rasoi has received your order and will confirm it shortly.</p>
     <div class="confirm-row"><span>Items</span><span class="confirm-items">${esc(order.items)}</span></div>
     ${order.note?`<div class="confirm-row"><span>Note</span><span>${esc(order.note)}</span></div>`:''}
     <div class="confirm-row"><span>Phone</span><span>${esc(order.phone)}</span></div>
@@ -345,6 +345,17 @@ async function submitOrder(event){
   try{
     const r=await fetch(`${SUPA_URL}/rest/v1/orders`,{method:'POST',headers:HEADERS,body:JSON.stringify(order)});
     if(!r.ok)throw new Error(await r.text());
+    // Update local sold counts so remaining stock refreshes immediately
+    if(order.items){
+      order.items.split(/[,]+/).forEach(item=>{
+        const m=item.trim().match(/^(\d+)\s*[x*]\s*(.+)/i);
+        if(m){
+          const qty=parseInt(m[1]);
+          const name=m[2].trim();
+          soldCounts[name]=(soldCounts[name]||0)+qty;
+        }
+      });
+    }
     clearOrder();
     showConfirmation(order);
     setStatus('ok','Order sent to kitchen');
