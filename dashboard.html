@@ -488,6 +488,7 @@ async function deleteMenuItem(id){
 }
 
 let dragSrcIndex = null;
+const confirmedOrders = new Set();
 
 function renderMenuManager(){
   renderKitchenStatus();
@@ -631,9 +632,18 @@ Delivery: 8:00 – 8:30 AM (breakfast) or 8:00 – 8:30 PM (dinner)
   if(customerPhone){
     window.open(`https://wa.me/91${customerPhone}?text=${encoded}`,'_blank');
   } else {
-    // fallback: open WA with no number so kitchen can pick
     window.open(`https://wa.me/?text=${encoded}`,'_blank');
     showToast('Phone number not found — please select contact manually');
+  }
+  confirmedOrders.add(id);
+  const btn=document.getElementById('confirm-btn-'+id);
+  if(btn){
+    btn.textContent='✓ Confirmed';
+    btn.style.background='rgba(100,100,100,.15)';
+    btn.style.borderColor='rgba(100,100,100,.3)';
+    btn.style.color='var(--text2)';
+    btn.disabled=true;
+    btn.style.cursor='default';
   }
 }
 
@@ -676,7 +686,7 @@ function renderOrders(){
         <div class="o-footer">
           <div class="o-price">${o.price?money(o.price):''}</div>
           <div class="o-actions">
-            ${o.status==='new'?`<button class="btn-sm" style="background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.4);color:#25d366;font-weight:700;" onclick="confirmOrderWhatsApp(${o.id})">✓ Confirm</button>`:''}
+            ${o.status==='new'?`<button class="btn-sm" id="confirm-btn-${o.id}" style="${confirmedOrders.has(o.id)?'background:rgba(100,100,100,.15);border-color:rgba(100,100,100,.3);color:var(--text2);cursor:default;':'background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.4);color:#25d366;font-weight:700;'}" ${confirmedOrders.has(o.id)?'disabled':''} onclick="confirmOrderWhatsApp(${o.id})">${confirmedOrders.has(o.id)?'✓ Confirmed':'✓ Confirm'}</button>`:''}
             ${NEXT[o.status]?`<button class="btn-sm" onclick="nextStatus(${o.id})">${NEXT_LBL[o.status]}</button>`:''}
             <button class="btn-sm btn-danger" onclick="deleteOrder(${o.id})">Delete</button>
           </div>
