@@ -151,6 +151,14 @@ textarea{resize:vertical;min-height:68px;}
 .cap-indicator{font-size:11px;color:var(--text2);margin-top:4px;}
 .cap-indicator.near{color:var(--amber);}
 .cap-indicator.full{color:var(--red-t);font-weight:700;}
+
+.menu-drag-list{list-style:none;padding:0;margin:0;}
+.menu-drag-item{display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:0.5px solid var(--border);cursor:default;}
+.menu-drag-item:last-child{border:none;}
+.drag-handle{cursor:grab;color:var(--text3);font-size:18px;padding:10px 4px 0 0;user-select:none;flex-shrink:0;line-height:1;}
+.drag-handle:active{cursor:grabbing;}
+.menu-drag-item.dragging{opacity:.4;background:var(--bg2);border-radius:8px;}
+.menu-drag-item.drag-over{border-top:2px solid var(--green);}
 </style>
 </head>
 <body>
@@ -177,7 +185,7 @@ textarea{resize:vertical;min-height:68px;}
     <div style="display:flex;align-items:center;font-size:12px;color:var(--text2);">
       <span class="sync-dot loading" id="sync-dot"></span>
       <span id="sync-label">Connecting</span>
-      <a class="customer-link" href="customer.html">Customer page</a>
+      <a class="customer-link" href="index.html">Customer page</a>
       <button class="logout-btn" onclick="lockDashboard()">Lock</button>
     </div>
   </div>
@@ -396,7 +404,7 @@ async function syncAll(silent=false){
     const [o,e]=await Promise.all([apiGet('orders'),apiGet('expenses')]);
     orders=o; expenses=e;
     try{
-      menuItems=await apiGet('menu_items','','id.asc');
+      menuItems=await apiGet('menu_items','','sort_order.asc,id.asc');
       menuError='';
     } catch(menuErr){
       menuItems=[];
@@ -479,6 +487,8 @@ async function deleteMenuItem(id){
   } catch(e){ showToast('Error deleting menu item'); }
 }
 
+let dragSrcIndex = null;
+
 function renderMenuManager(){
   renderKitchenStatus();
   const target=document.getElementById('menu-list');
@@ -488,33 +498,77 @@ function renderMenuManager(){
     return;
   }
   const soldCounts=computeSoldCounts();
-  target.innerHTML=menuItems.length
-    ? menuItems.map(item=>{
-        const cap=item.daily_cap?parseInt(item.daily_cap):null;
-        const sold=soldCounts[item.name]||0;
-        const remaining=cap?Math.max(0,cap-sold):null;
-        let capStatus='';
-        if(cap){
-          if(remaining===0) capStatus=`<span class="cap-indicator full">Sold out today (${sold}/${cap})</span>`;
-          else if(remaining<=2) capStatus=`<span class="cap-indicator near">${remaining} remaining today (${sold}/${cap})</span>`;
-          else capStatus=`<span class="cap-indicator">${sold}/${cap} sold today</span>`;
-        }
-        return `
-        <div class="exp-row" style="align-items:flex-start;">
-          <div style="flex:1;display:grid;grid-template-columns:1fr 80px 90px;gap:8px;align-items:start;">
-            <input id="menu-name-${item.id}" value="${esc(item.name)}" placeholder="Item name"/>
-            <input id="menu-price-${item.id}" value="${item.price||''}" type="number" placeholder="Rs"/>
-            <input id="menu-cap-${item.id}" value="${item.daily_cap||''}" type="number" placeholder="Daily cap" min="0" title="Max orders per day (leave blank for unlimited)"/>
-            <textarea id="menu-description-${item.id}" style="grid-column:1/-1;" placeholder="Description">${esc(item.description||'')}</textarea>
-            ${cap?`<div style="grid-column:1/-1;">${capStatus}</div>`:''}
-          </div>
-          <div class="o-actions" style="margin-left:8px;flex-shrink:0;">
-            <button class="btn-sm" onclick="saveMenuItem(${item.id})">Save</button>
-            <button class="btn-sm btn-danger" onclick="deleteMenuItem(${item.id})">Delete</button>
-          </div>
-        </div>`;
-      }).join('')
-    : '<div class="empty" style="padding:14px 0">No menu items yet. Add your first item above.</div>';
+  if(!menuItems.length){
+    target.innerHTML='<div class="empty" style="padding:14px 0">No menu items yet. Add your first item above.</div>';
+    return;
+  }
+  const ul=document.createElement('ul');
+  ul.className='menu-drag-list';
+  menuItems.forEach((item,i)=>{
+    const cap=item.daily_cap?parseInt(item.daily_cap):null;
+    const sold=soldCounts[item.name]||0;
+    const remaining=cap?Math.max(0,cap-sold):null;
+    let capStatus='';
+    if(cap){
+      if(remaining===0) capStatus=`<span class="cap-indicator full">Sold out today (${sold}/${cap})</span>`;
+      else if(remaining<=2) capStatus=`<span class="cap-indicator near">${remaining} remaining today (${sold}/${cap})</span>`;
+      else capStatus=`<span class="cap-indicator">${sold}/${cap} sold today</span>`;
+    }
+    const li=document.createElement('li');
+    li.className='menu-drag-item';
+    li.draggable=true;
+    li.dataset.index=i;
+    li.innerHTML=`
+      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <div style="flex:1;display:grid;grid-template-columns:1fr 80px 90px;gap:8px;align-items:start;">
+        <input id="menu-name-${item.id}" value="${esc(item.name)}" placeholder="Item name"/>
+        <input id="menu-price-${item.id}" value="${item.price||''}" type="number" placeholder="Rs"/>
+        <input id="menu-cap-${item.id}" value="${item.daily_cap||''}" type="number" placeholder="Daily cap" min="0" title="Max orders per day (leave blank for unlimited)"/>
+        <textarea id="menu-description-${item.id}" style="grid-column:1/-1;" placeholder="Description">${esc(item.description||'')}</textarea>
+        ${cap?`<div style="grid-column:1/-1;">${capStatus}</div>`:''}
+      </div>
+      <div class="o-actions" style="margin-left:8px;flex-shrink:0;">
+        <button class="btn-sm" onclick="saveMenuItem(${item.id})">Save</button>
+        <button class="btn-sm btn-danger" onclick="deleteMenuItem(${item.id})">Delete</button>
+      </div>`;
+    li.addEventListener('dragstart',e=>{
+      dragSrcIndex=i;
+      li.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    li.addEventListener('dragend',()=>{
+      li.classList.remove('dragging');
+      ul.querySelectorAll('.menu-drag-item').forEach(el=>el.classList.remove('drag-over'));
+    });
+    li.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      ul.querySelectorAll('.menu-drag-item').forEach(el=>el.classList.remove('drag-over'));
+      li.classList.add('drag-over');
+    });
+    li.addEventListener('drop',async e=>{
+      e.preventDefault();
+      const destIndex=parseInt(li.dataset.index);
+      if(dragSrcIndex===null||dragSrcIndex===destIndex)return;
+      // Reorder menuItems array
+      const moved=menuItems.splice(dragSrcIndex,1)[0];
+      menuItems.splice(destIndex,0,moved);
+      dragSrcIndex=null;
+      // Persist new sort_order to Supabase
+      await saveMenuOrder();
+      renderMenuManager();
+    });
+    ul.appendChild(li);
+  });
+  target.innerHTML='';
+  target.appendChild(ul);
+}
+
+async function saveMenuOrder(){
+  try{
+    await Promise.all(menuItems.map((item,i)=>apiUpdate('menu_items',item.id,{sort_order:i})));
+    showToast('Menu order saved');
+  } catch(e){ showToast('Error saving menu order'); }
 }
 
 async function toggleKitchenOpen(){
@@ -559,6 +613,30 @@ async function deleteOrder(id){
   } catch(e){ showToast('Error deleting order'); }
 }
 
+function confirmOrderWhatsApp(id){
+  const o=orders.find(x=>x.id===id);
+  if(!o)return;
+  // Extract just the phone number (before " / Flat")
+  const rawPhone=String(o.phone||'').split('/')[0].trim().replace(/\D/g,'');
+  const customerPhone=rawPhone.length>=10?rawPhone:'';
+  const itemsText=o.items||'your items';
+  const name=o.name||'there';
+  const msg=`Hi ${name}, your order has been confirmed! 🙏
+
+Items: ${itemsText}
+Delivery: 8:00 – 8:30 AM (breakfast) or 8:00 – 8:30 PM (dinner)
+
+— Radhe Rasoi`;
+  const encoded=encodeURIComponent(msg);
+  if(customerPhone){
+    window.open(`https://wa.me/91${customerPhone}?text=${encoded}`,'_blank');
+  } else {
+    // fallback: open WA with no number so kitchen can pick
+    window.open(`https://wa.me/?text=${encoded}`,'_blank');
+    showToast('Phone number not found — please select contact manually');
+  }
+}
+
 function setOrderFilter(f){orderFilter=f;renderOrders();}
 
 function renderOrders(){
@@ -598,6 +676,7 @@ function renderOrders(){
         <div class="o-footer">
           <div class="o-price">${o.price?money(o.price):''}</div>
           <div class="o-actions">
+            ${o.status==='new'?`<button class="btn-sm" style="background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.4);color:#25d366;font-weight:700;" onclick="confirmOrderWhatsApp(${o.id})">✓ Confirm</button>`:''}
             ${NEXT[o.status]?`<button class="btn-sm" onclick="nextStatus(${o.id})">${NEXT_LBL[o.status]}</button>`:''}
             <button class="btn-sm btn-danger" onclick="deleteOrder(${o.id})">Delete</button>
           </div>
