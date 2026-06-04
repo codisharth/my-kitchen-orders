@@ -86,6 +86,9 @@ button{font:inherit;}
 .trust-badges{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
 .trust-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.2);border-radius:4px;padding:4px 9px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.02em;}
 .trust-badge .tbicon{font-size:13px;}
+
+.stock-badge{display:inline-block;font-size:11px;font-weight:700;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.25);color:var(--gold);border-radius:4px;padding:2px 7px;margin-top:4px;}
+.stock-badge.low{background:rgba(207,68,68,.1);border-color:rgba(207,68,68,.3);color:#cf8080;}
 </style>
 </head>
 <body>
@@ -236,7 +239,7 @@ function renderMenu(){
         <span>${money(item.price)}</span>
         ${item.description?`<span class="item-description">${formatDescription(item.description)}</span>`:''}
         ${soldOut?`<span class="soldout-badge">Sold out for today</span>`:''}
-        ${!soldOut&&remaining!==null&&remaining<=3&&remaining>0?`<span class="soldout-badge" style="background:#fff3e8;color:#70410e;">${remaining} left</span>`:''}
+        ${!soldOut&&remaining!==null?`<span class="stock-badge">${remaining} of ${item.daily_cap} remaining</span>`:''}
       </div>
       <div class="qty">
         <button type="button" onclick="changeQty(${i},-1)" ${soldOut?'disabled':''}>-</button>
@@ -357,7 +360,7 @@ async function loadMenu(){
   setStatus('loading','Loading menu...');
   try{
     const [menuResponse,settingsResponse,ordersResponse]=await Promise.all([
-      fetch(`${SUPA_URL}/rest/v1/menu_items?order=id.desc`,{headers:HEADERS}),
+      fetch(`${SUPA_URL}/rest/v1/menu_items?order=sort_order.asc,id.asc`,{headers:HEADERS}),
       fetch(`${SUPA_URL}/rest/v1/settings?id=eq.kitchen_open`,{headers:HEADERS}),
       fetch(`${SUPA_URL}/rest/v1/orders?date=eq.${today()}&order=id.asc`,{headers:HEADERS})
     ]);
